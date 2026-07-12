@@ -5,8 +5,6 @@ from __future__ import annotations
 
 import argparse
 import hashlib
-import shutil
-import tempfile
 import zipfile
 from pathlib import Path
 
@@ -41,12 +39,13 @@ def split_body(text: str) -> str:
 
 
 def package(source: Path, output: Path) -> None:
-    with tempfile.TemporaryDirectory(prefix="purpose-check-build-") as tmp:
-        root = Path(tmp) / "purpose-check"
-        root.mkdir()
-        shutil.copy2(source, root / "SKILL.md")
-        with zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED) as archive:
-            archive.write(root / "SKILL.md", "purpose-check/SKILL.md")
+    payload = source.read_bytes()
+    info = zipfile.ZipInfo("purpose-check/SKILL.md", date_time=(2026, 1, 1, 0, 0, 0))
+    info.compress_type = zipfile.ZIP_DEFLATED
+    info.external_attr = 0o100644 << 16
+    info.create_system = 3
+    with zipfile.ZipFile(output, "w") as archive:
+        archive.writestr(info, payload)
 
 
 def sha256(path: Path) -> str:
