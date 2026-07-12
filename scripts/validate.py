@@ -51,6 +51,8 @@ def validate_skill() -> None:
         fail("trigger description regressed")
     if "version: 1.3.0" not in frontmatter:
         fail("version 1.3.0 metadata missing")
+    if "author: Colt Coan" not in frontmatter:
+        fail("author metadata must be Colt Coan")
     if body.lower().count("purpose anchor") < 4:
         fail("purpose anchor contract is incomplete")
     if "Stage 1 block" in body:

@@ -4,7 +4,7 @@ description: "Use when ambiguity about the audience, intended outcome, constrain
 license: MIT
 metadata:
   version: 1.3.0
-  author: Hermes Agent
+  author: Colt Coan
   platforms: [linux, macos, windows]
   hermes:
     tags: [purpose, judgment, requirements, decision-making, alignment]

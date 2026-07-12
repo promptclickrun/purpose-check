@@ -8,6 +8,8 @@ Drop it into any harness that can load Markdown instructions, agent skills, syst
 
 Current version: **1.3.0**
 
+Author: **Colt Coan**
+
 ## Why this exists
 
 Modern language models are unusually good at producing artifacts. They can write the code, format the report, generate the campaign, design the system, and finish the checklist. That capability creates a subtler failure mode: the model can satisfy the request while missing the point.
