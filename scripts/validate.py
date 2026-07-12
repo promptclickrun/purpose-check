@@ -11,6 +11,8 @@ ROOT = Path(__file__).resolve().parents[1]
 EXPECTED = {
     "SKILL.md",
     "README.md",
+    "docs/index.html",
+    ".github/workflows/pages.yml",
     "CONTRIBUTING.md",
     "LICENSE",
     "reviews/README.md",
@@ -93,6 +95,24 @@ def validate_readme() -> None:
             fail(f"README link target missing: {clean}")
 
 
+def validate_site() -> None:
+    site = (ROOT / "docs" / "index.html").read_text(encoding="utf-8")
+    required = [
+        "<!doctype html>",
+        "Purpose Check — Build the right thing.",
+        "const gateData",
+        "anchorInput",
+        "prefers-reduced-motion",
+        "promptclickrun/purpose-check",
+        "Sterling Crispin",
+    ]
+    missing = [phrase for phrase in required if phrase not in site]
+    if missing:
+        fail(f"landing page is missing required content: {missing}")
+    if "<script src=" in site:
+        fail("landing page must remain self-contained")
+
+
 def main() -> int:
     for name in EXPECTED:
         if not (ROOT / name).exists():
@@ -103,6 +123,7 @@ def main() -> int:
             fail(f"vendor-specific build artifact remains: {path.relative_to(ROOT)}")
     validate_skill()
     validate_readme()
+    validate_site()
     print("PASS: portable SKILL.md, review archive, behavioral contracts, and README links are valid")
     return 0
 
