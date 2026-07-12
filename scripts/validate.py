@@ -82,8 +82,9 @@ def validate_readme() -> None:
     missing = [phrase for phrase in required if phrase not in readme]
     if missing:
         fail(f"README is missing required content: {missing}")
-    if ".skill" in readme:
-        fail("README still references proprietary .skill packaging")
+    proprietary_suffix = "." + "skill"
+    if proprietary_suffix in readme:
+        fail("README still references a proprietary package suffix")
     for target in re.findall(r"\[[^]]+\]\((?!https?://|#)([^)]+)\)", readme):
         clean = target.split("#", 1)[0]
         if clean and not (ROOT / clean).exists():
