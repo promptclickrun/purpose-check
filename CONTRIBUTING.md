@@ -26,11 +26,10 @@ Open an issue or include this information in the pull request:
 ## Development
 
 ```bash
-python3 scripts/build.py
 python3 scripts/validate.py
 ```
 
-The build must produce both package variants without changing the behavioral body.
+The repository ships one canonical `SKILL.md`. Keep it portable. Harness-specific installation guidance belongs in documentation, while the behavioral source remains unchanged.
 
 ## Pull requests
 

@@ -1,16 +1,13 @@
 #!/usr/bin/env python3
-"""Validate the Purpose Check repository and release artifacts."""
+"""Validate the portable Purpose Check SKILL.md repository."""
 
 from __future__ import annotations
 
-import hashlib
 import re
 import sys
-import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = "1.3.0"
 EXPECTED = {
     "SKILL.md",
     "README.md",
@@ -21,10 +18,6 @@ EXPECTED = {
     "reviews/02-v1.1-review-96.pdf",
     "reviews/03-v1.2-review-89.pdf",
     "reviews/04-v1.3-review-95.pdf",
-    "variants/agent-skills/SKILL.md",
-    f"dist/purpose-check-v{VERSION}.skill",
-    f"dist/purpose-check-v{VERSION}-agent-skills.skill",
-    "dist/SHA256SUMS",
 }
 
 
@@ -32,71 +25,49 @@ def fail(message: str) -> None:
     raise AssertionError(message)
 
 
-def parse_frontmatter(path: Path) -> tuple[dict[str, str], str, str]:
+def parse_skill(path: Path) -> tuple[str, str]:
     text = path.read_text(encoding="utf-8")
     if not text.startswith("---\n"):
-        fail(f"{path}: missing byte-zero frontmatter")
+        fail("SKILL.md must start with byte-zero YAML frontmatter")
     end = text.find("\n---\n", 4)
     if end < 0:
-        fail(f"{path}: unclosed frontmatter")
-    raw = text[4:end]
-    body = text[end + 5 :]
-    values: dict[str, str] = {}
-    for line in raw.splitlines():
-        match = re.match(r"^(name|description|license):\s*[\"']?(.*?)[\"']?$", line)
-        if match:
-            values[match.group(1)] = match.group(2)
-    return values, raw, body
+        fail("SKILL.md frontmatter is not closed")
+    return text[4:end], text[end + 5 :]
 
 
-def validate_skill(path: Path, strict: bool) -> None:
-    values, raw, body = parse_frontmatter(path)
-    if values.get("name") != "purpose-check":
-        fail(f"{path}: wrong name")
-    description = values.get("description", "")
-    if not description or len(description) > 1024:
-        fail(f"{path}: invalid description")
-    if "consequential mid-task forks" not in description:
-        fail(f"{path}: trigger description regressed")
-    if "purpose anchor" not in body.lower():
-        fail(f"{path}: purpose anchor missing")
+def validate_skill() -> None:
+    frontmatter, body = parse_skill(ROOT / "SKILL.md")
+    name = re.search(r"^name:\s*([^\n]+)$", frontmatter, re.MULTILINE)
+    description_match = re.search(r'^description:\s*["\']?(.*?)["\']?$', frontmatter, re.MULTILINE)
+    if not name or name.group(1).strip() != "purpose-check":
+        fail("skill name must be purpose-check")
+    if description_match is None:
+        fail("skill description is missing")
+    assert description_match is not None
+    description_text = description_match.group(1)
+    if len(description_text) > 1024:
+        fail("skill description is too long")
+    if "consequential mid-task forks" not in description_text:
+        fail("trigger description regressed")
+    if "version: 1.3.0" not in frontmatter:
+        fail("version 1.3.0 metadata missing")
+    if body.lower().count("purpose anchor") < 4:
+        fail("purpose anchor contract is incomplete")
     if "Stage 1 block" in body:
-        fail(f"{path}: stale Stage 1 block reference")
-    if strict:
-        top_level = {
-            line.split(":", 1)[0]
-            for line in raw.splitlines()
-            if line and not line.startswith(" ") and ":" in line
-        }
-        allowed = {"name", "description", "license", "compatibility", "metadata", "allowed-tools"}
-        if top_level - allowed:
-            fail(f"{path}: unexpected strict frontmatter keys: {sorted(top_level - allowed)}")
-        for line in raw.splitlines():
-            if line.startswith("  ") and ("[" in line or "{" in line):
-                fail(f"{path}: structured metadata must be flattened")
+        fail("stale Stage 1 block reference remains")
+    required = [
+        "Explicit, current, supplied context satisfies that confirmation",
+        "routine work ships quietly",
+        "Material mid-task forks were checked against the purpose anchor",
+    ]
+    for phrase in required:
+        if phrase not in body:
+            fail(f"required behavioral contract missing: {phrase}")
 
 
-def sha256(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
-
-
-def validate_package(path: Path, expected_skill: Path) -> None:
-    with zipfile.ZipFile(path) as archive:
-        names = archive.namelist()
-        if names != ["purpose-check/SKILL.md"]:
-            fail(f"{path}: unexpected archive members: {names}")
-        payload = archive.read(names[0])
-    if hashlib.sha256(payload).hexdigest() != sha256(expected_skill):
-        fail(f"{path}: packaged SKILL.md differs from source")
-
-
-def validate_links() -> None:
+def validate_readme() -> None:
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
-    for target in re.findall(r"\[[^]]+\]\((?!https?://|#)([^)]+)\)", readme):
-        clean = target.split("#", 1)[0]
-        if clean and not (ROOT / clean).exists():
-            fail(f"README link target missing: {clean}")
-    required_phrases = [
+    required = [
         "GPT 5.6",
         "Claude Opus 4.8",
         "Claude Fable 5",
@@ -104,37 +75,32 @@ def validate_links() -> None:
         "MAI Code 1 Flash",
         "Sterling Crispin",
         "Prompt your agent",
-        "Manual",
+        "Manual install",
+        "any agent harness",
+        "SKILL.md",
     ]
-    missing = [phrase for phrase in required_phrases if phrase not in readme]
+    missing = [phrase for phrase in required if phrase not in readme]
     if missing:
         fail(f"README is missing required content: {missing}")
-
-
-def validate_manifest() -> None:
-    manifest = ROOT / "dist" / "SHA256SUMS"
-    for line in manifest.read_text(encoding="utf-8").splitlines():
-        digest, name = line.split("  ", 1)
-        path = ROOT / name
-        if not path.exists() or sha256(path) != digest:
-            fail(f"Manifest mismatch: {name}")
+    if ".skill" in readme:
+        fail("README still references proprietary .skill packaging")
+    for target in re.findall(r"\[[^]]+\]\((?!https?://|#)([^)]+)\)", readme):
+        clean = target.split("#", 1)[0]
+        if clean and not (ROOT / clean).exists():
+            fail(f"README link target missing: {clean}")
 
 
 def main() -> int:
     for name in EXPECTED:
         if not (ROOT / name).exists():
-            fail(f"Missing required file: {name}")
-
-    canonical = ROOT / "SKILL.md"
-    strict = ROOT / "variants" / "agent-skills" / "SKILL.md"
-    validate_skill(canonical, strict=False)
-    validate_skill(strict, strict=True)
-    validate_package(ROOT / "dist" / f"purpose-check-v{VERSION}.skill", canonical)
-    validate_package(ROOT / "dist" / f"purpose-check-v{VERSION}-agent-skills.skill", strict)
-    validate_links()
-    validate_manifest()
-
-    print("PASS: source, variants, packages, hashes, review archive, and README links are valid")
+            fail(f"missing required file: {name}")
+    forbidden = [ROOT / "dist", ROOT / "variants", ROOT / "scripts" / "build.py"]
+    for path in forbidden:
+        if path.exists():
+            fail(f"vendor-specific build artifact remains: {path.relative_to(ROOT)}")
+    validate_skill()
+    validate_readme()
+    print("PASS: portable SKILL.md, review archive, behavioral contracts, and README links are valid")
     return 0
 
 
